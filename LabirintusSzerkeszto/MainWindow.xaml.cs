@@ -91,42 +91,41 @@ namespace LabirintusSzerkeszto
             // Jobb eger section, itt mozgat
             if (e.ChangedButton == MouseButton.Right)
             {
-                isPanning = true;
+                isPanning = true; // elkezdi a draget
 
-                startPanPoint = e.GetPosition(this);
-
-
-                startXOffset = CanvasTransform.X;
-                startYOffset = CanvasTransform.Y;
+                startPanPoint = e.GetPosition(this); // megadja a kezdo pozijat a dragnek
 
 
-                BuildCanvas.CaptureMouse();
-                e.Handled = true;
+                startXOffset = CanvasTransform.X; // megadja a dragging kezdo offsetjet
+                startYOffset = CanvasTransform.Y; // canvastransform alapbol ad egy tengelyt amin mozoghat a canvas
+
+
+                BuildCanvas.CaptureMouse(); // megragadja az egeret, drag modba lep, kimehet az ablakbol is akar
+                e.Handled = true; // elvegzi az eventet, lezarja
                 return;
             }
 
-            if (e.ChangedButton == MouseButton.Left)
+            if (e.ChangedButton == MouseButton.Left) // kifesti a negyzeteket, checkol bal clicket
             {
-                //Kattintott negyzetet kiszamol 
-                Point clickPosition = e.GetPosition(BuildCanvas);
+                Point clickPosition = e.GetPosition(BuildCanvas); //kattintas pozicioja a bal felso sarokhoz kepest
 
-                int tileXIndex = (int)clickPosition.X / TileSize;
-                int tileYIndex = (int)clickPosition.Y / TileSize;
+                int tileXIndex = (int)clickPosition.X / TileSize; // X-edik tile
+                int tileYIndex = (int)clickPosition.Y / TileSize; // Y-adik tile
 
                 // Határon belul ellenorzes
-                if (tileXIndex >= 0 && tileXIndex < currentWidthInTiles && tileYIndex >= 0 && tileYIndex < currentHeightInTiles)
+                if (tileXIndex >= 0 && tileXIndex < currentWidthInTiles && tileYIndex >= 0 && tileYIndex < currentHeightInTiles) // hataron belul kattintas
                 {
-                    if (mazeArray[tileXIndex, tileYIndex] != 0)
+                    if (mazeArray[tileXIndex, tileYIndex] != 0) //megnezi hogy van e mar ut ( 0 = ut )
                     {
-                        // Elmenteshez szukseges sor
-                        mazeArray[tileXIndex, tileYIndex] = 0;
+
+                        mazeArray[tileXIndex, tileYIndex] = 0; // utat tesz a mentesi array-ba
 
                         // Specialis elemek szamolas
 
-                        int tileX = tileXIndex * TileSize;
+                        int tileX = tileXIndex * TileSize; // kiszamolja a poziciojat a tile-nak ( bal felso saroktol)
                         int tileY = tileYIndex * TileSize;
 
-                        Rectangle road = new Rectangle
+                        Rectangle road = new Rectangle // ut kinezete
                         {
                             Width = TileSize,
                             Height = TileSize,
@@ -134,10 +133,10 @@ namespace LabirintusSzerkeszto
                         };
 
                         // Specialis elementnek pozicio adas
-                        Canvas.SetLeft(road, tileX);
+                        Canvas.SetLeft(road, tileX); // elem elhelyezese
                         Canvas.SetTop(road, tileY);
 
-                        BuildCanvas.Children.Add(road);
+                        BuildCanvas.Children.Add(road); // hozzaadja az utata
                     }
                 }
             }
@@ -145,15 +144,15 @@ namespace LabirintusSzerkeszto
 
         private void BuildCanvas_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isPanning)
+            if (isPanning) // checkolja hogy eppen draggel-e
             {
                 //Mozgas Kiszamolasa
 
-                Point currentPoint = e.GetPosition(this);
-                double deltaX = currentPoint.X - startPanPoint.X;
+                Point currentPoint = e.GetPosition(this); // megnezi az eger poziciojat
+                double deltaX = currentPoint.X - startPanPoint.X; // megnezi a delta mozgast (az eger poziciojanak es drag startjanak kulonbsege)
                 double deltaY = currentPoint.Y - startPanPoint.Y;
 
-                CanvasTransform.X = startXOffset + deltaX;
+                CanvasTransform.X = startXOffset + deltaX; // eltoljuk a poziciojat, offsethez adjuk, (ha mar alapbol el volt tolva onnan szamoljuk)
                 CanvasTransform.Y = startYOffset + deltaY;
             }
         }
@@ -161,11 +160,11 @@ namespace LabirintusSzerkeszto
         // Mozgatas Vege
         private void BuildCanvas_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Right)
+            if (e.ChangedButton == MouseButton.Right) // ellenorzi hogy a jobb click lett lenyomva
             {
-                isPanning = false;
-                BuildCanvas.ReleaseMouseCapture();
-                e.Handled = true;
+                isPanning = false; // dragging leallitasa
+                BuildCanvas.ReleaseMouseCapture(); // ha meg mindig captureolve lenne akkor ha ki menne az ablakbol is "ra lenne tapadva az eger"
+                e.Handled = true; // esemeny lezarasa
             }
         }
 
@@ -179,7 +178,7 @@ namespace LabirintusSzerkeszto
 
             double currentScale = CanvasScale.ScaleX; // jelenlegi scale
 
-            if (e.Delta > 0)
+            if (e.Delta > 0) // Delta = irany; ha pozitiv akkor befele, ha negativ akkor kifele
             {
                 currentScale += zoomFactor;
             }
@@ -189,12 +188,12 @@ namespace LabirintusSzerkeszto
             }
 
             if (currentScale < 0.5) currentScale = 0.5;
-            if (currentScale > 5.0) currentScale = 5.0;
+            if (currentScale > 5.0) currentScale = 5.0; // itt a hatar a zoomra
 
-            CanvasScale.ScaleX = currentScale;
-            CanvasScale.ScaleY = currentScale;
+            CanvasScale.ScaleX = currentScale; // modositja a zoomot X
+            CanvasScale.ScaleY = currentScale; // modositja a zoomot Y
 
-            e.Handled = true;
+            e.Handled = true; //esemeny lezarasa
         }
 
         // Export Gomb (Meg szarul nez ki majd megcsinalom)
