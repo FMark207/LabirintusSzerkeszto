@@ -1,0 +1,62 @@
+﻿<Window x:Class="LabirintusSzerkeszto.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:LabirintusSzerkeszto"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="175"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="150"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" BorderBrush="Black" BorderThickness="4"></Border>
+                <Border Grid.Row="1" BorderBrush="Black" BorderThickness="4"></Border>
+
+                <TextBox x:Name="TxtXSize" Grid.Row="0" Text="10" Margin="42,54,42,54" FontSize="20" TextAlignment="Center" TextChanged="SizeChanged_Event"/>
+                <TextBox x:Name="TxtYSize" Grid.Row="1" Text="10" Margin="42,54,42,54" FontSize="20" TextAlignment="Center" TextChanged="SizeChanged_Event"/>
+
+                <TextBlock Grid.Row="0" Text="X-Size" VerticalAlignment="Top" HorizontalAlignment="Center" Padding="10" FontSize="20" FontWeight="Bold"/>
+                <TextBlock Grid.Row="1" Text="Y-Size" VerticalAlignment="Top" HorizontalAlignment="Center" Padding="10" FontSize="20" FontWeight="Bold"/>
+                <TextBlock Grid.Row="9" Text="Export Thing" VerticalAlignment="Top" HorizontalAlignment="Center" Padding="10" FontSize="20" FontWeight="Bold"/>
+
+                <!-- Cseréld le a XAML-ben a legalsó TextBlock Grid.Row="9" sort erre: -->
+                <Button Grid.Row="9" Content="Export" Margin="20" FontSize="20" FontWeight="Bold" Click="BtnExport_Click"/>
+
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Ez a beágyazott Grid jelöli ki a piros vonallal kért területet, és levágja a kilógó részeket -->
+        <Grid Grid.Column="1" Margin="28,49,34,48" ClipToBounds="True">
+            <!-- A Canvas-ról LEVESSZÜK a Margint, hogy szabadon mozoghasson a belső térben -->
+            <Canvas x:Name="BuildCanvas" MouseDown="BuildCanvas_MouseDown" PreviewMouseWheel="BuildCanvas_PreviewMouseWheel" MouseMove="BuildCanvas_MouseMove" MouseUp="BuildCanvas_MouseUp">
+                <Canvas.RenderTransform>
+                    <ScaleTransform x:Name="CanvasScale" ScaleX="1" ScaleY="1"/>
+                </Canvas.RenderTransform>
+                <Canvas.Background>
+                    <ImageBrush x:Name="CanvasTileBrush" 
+                            TileMode="Tile"  
+                            Viewport="0,0,16,16" 
+                            ViewportUnits="Absolute"/>
+                </Canvas.Background>
+            </Canvas>
+        </Grid>
+    </Grid>
+</Window>
