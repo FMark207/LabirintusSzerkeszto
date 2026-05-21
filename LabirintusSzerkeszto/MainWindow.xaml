@@ -43,9 +43,7 @@
             </Grid>
         </ScrollViewer>
 
-        <!-- Ez a beágyazott Grid jelöli ki a piros vonallal kért területet, és levágja a kilógó részeket -->
         <Grid Grid.Column="1" Margin="28,49,34,48" ClipToBounds="True">
-            <!-- A Canvas-ról LEVESSZÜK a Margint, hogy szabadon mozoghasson a belső térben -->
             <Canvas x:Name="BuildCanvas" MouseDown="BuildCanvas_MouseDown" PreviewMouseWheel="BuildCanvas_PreviewMouseWheel" MouseMove="BuildCanvas_MouseMove" MouseUp="BuildCanvas_MouseUp">
                 <Canvas.RenderTransform>
                     <ScaleTransform x:Name="CanvasScale" ScaleX="1" ScaleY="1"/>

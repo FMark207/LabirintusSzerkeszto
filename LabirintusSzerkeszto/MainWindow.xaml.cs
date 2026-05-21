@@ -15,18 +15,18 @@ namespace LabirintusSzerkeszto
     public partial class MainWindow : Window
     {
         // Ne valtoztasd lecci mer furan neznenek ki az assetek
-        private const int TileSize = 16;
+        private const int TileSize = 16; // Pixel art miatt fix 16, de amugy a textura pixel meretei
 
-        private bool isPanning = false;
-        private Point startPanPoint;
-        private double startXOffset;
-        private double startYOffset;
+        private bool isPanning = false; // Megadja, hogy eppen draggelve van-e a targy
+        private Point startPanPoint; // Megadja pont formatumba azt, ahol le lett nyomva a jobb gomb
+        private double startXOffset; // Offset az eredeti helytol a Canvasnak X-tengelyen
+        private double startYOffset; // Offset az eredeti helytol a Canvasnak Y-tengelyen
 
-        private TranslateTransform CanvasTransform = new TranslateTransform();
+        private TranslateTransform CanvasTransform = new TranslateTransform(); 
 
-        private int[,] mazeArray;
-        private int currentWidthInTiles = 0;
-        private int currentHeightInTiles = 0;
+        private int[,] mazeArray; // Menteshez szukseges, az egesz map array valtozata
+        private int currentWidthInTiles = 0; // Canvas mennyi kocka X-tengelyen
+        private int currentHeightInTiles = 0; // Canvas mennyi kocka Y-tengelyen
 
         public MainWindow()
         {
@@ -45,7 +45,7 @@ namespace LabirintusSzerkeszto
             UpdateCanvasSize();
         }
 
-        // Minden Valtozasnal Dinamikus Valtozas
+        // Minden Text Valtozasnal Dinamikus Valtozas
         private void SizeChanged_Event(object sender, TextChangedEventArgs e)
         {
             UpdateCanvasSize();
@@ -172,12 +172,12 @@ namespace LabirintusSzerkeszto
         // Zoom function (lehet hogy chatgpt assist volt ebben)
         private void BuildCanvas_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            if (!Keyboard.IsKeyDown(Key.LeftCtrl) && !Keyboard.IsKeyDown(Key.RightCtrl))
+            if (!Keyboard.IsKeyDown(Key.LeftCtrl) && !Keyboard.IsKeyDown(Key.RightCtrl)) // szukseges gombok lenyomasanak ellenorzese
                 return;
 
-            double zoomFactor = 0.1;
+            double zoomFactor = 0.1; // zoom mennyisege
 
-            double currentScale = CanvasScale.ScaleX;
+            double currentScale = CanvasScale.ScaleX; // jelenlegi scale
 
             if (e.Delta > 0)
             {
