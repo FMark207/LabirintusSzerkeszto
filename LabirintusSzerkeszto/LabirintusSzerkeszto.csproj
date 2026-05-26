@@ -9,11 +9,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="assets\4_turn.png" />
+    <None Remove="assets\corner_turn_simple.png" />
+    <None Remove="assets\corridor.png" />
+    <None Remove="assets\dead_end.png" />
     <None Remove="assets\Empty_Tile.png" />
+    <None Remove="assets\Treasure_Chest.png" />
+    <None Remove="assets\t_turn.png" />
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="assets\4_turn.png" />
+    <Resource Include="assets\corner_turn_simple.png" />
+    <Resource Include="assets\corridor.png" />
+    <Resource Include="assets\dead_end.png" />
     <Resource Include="assets\Empty_Tile.png" />
+    <Resource Include="assets\Treasure_Chest.png" />
+    <Resource Include="assets\t_turn.png" />
   </ItemGroup>
 
 </Project>
