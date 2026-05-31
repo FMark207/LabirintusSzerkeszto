@@ -29,15 +29,34 @@
 
                 <Border Grid.Row="0" BorderBrush="Black" BorderThickness="4"></Border>
                 <Border Grid.Row="1" BorderBrush="Black" BorderThickness="4"></Border>
+                <Border Grid.Row="2" BorderBrush="Black" BorderThickness="4" Margin="5"></Border>
+                <Border Grid.Row="3" BorderBrush="Black" BorderThickness="4" Margin="5"></Border>
+                <Border Grid.Row="4" BorderBrush="Black" BorderThickness="4" Margin="5"></Border>
 
                 <TextBox x:Name="TxtXSize" Grid.Row="0" Text="10" Margin="42,54,42,54" FontSize="20" TextAlignment="Center" TextChanged="SizeChanged_Event"/>
                 <TextBox x:Name="TxtYSize" Grid.Row="1" Text="10" Margin="42,54,42,54" FontSize="20" TextAlignment="Center" TextChanged="SizeChanged_Event"/>
 
                 <TextBlock Grid.Row="0" Text="X-Size" VerticalAlignment="Top" HorizontalAlignment="Center" Padding="10" FontSize="20" FontWeight="Bold"/>
                 <TextBlock Grid.Row="1" Text="Y-Size" VerticalAlignment="Top" HorizontalAlignment="Center" Padding="10" FontSize="20" FontWeight="Bold"/>
-                <TextBlock Grid.Row="9" Text="Export Thing" VerticalAlignment="Top" HorizontalAlignment="Center" Padding="10" FontSize="20" FontWeight="Bold"/>
 
-                <!-- Cseréld le a XAML-ben a legalsó TextBlock Grid.Row="9" sort erre: -->
+                <Button x:Name="BtnModePath" Grid.Row="2" Margin="10" Background="LightGreen" Click="BtnModePath_Click">
+                    <StackPanel>
+                        <Image Source="pack://application:,,,/assets/corridor.png" Width="64" Height="64" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                        <TextBlock Text="Path Mode" TextAlignment="Center" FontWeight="Bold" Margin="0,5,0,0" FontSize="16"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="BtnModeTreasure" Grid.Row="3" Margin="10" Background="LightGray" Click="BtnModeTreasure_Click">
+                    <StackPanel>
+                        <Image Source="pack://application:,,,/assets/Treasure_Chest.png" Width="64" Height="64" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                        <TextBlock Text="Treasure Mode" TextAlignment="Center" FontWeight="Bold" Margin="0,5,0,0" FontSize="14"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="BtnModeDelete" Grid.Row="4" Margin="10" Background="LightGray" FontSize="20" FontWeight="Bold" Click="BtnModeDelete_Click">
+                    Delete Mode
+                </Button>
+
                 <Button Grid.Row="9" Content="Export" Margin="20" FontSize="20" FontWeight="Bold" Click="BtnExport_Click"/>
 
             </Grid>

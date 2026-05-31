@@ -1,41 +1,46 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using Microsoft.Win32;
 
 namespace LabirintusSzerkeszto
 {
+    public enum DrawMode
+    {
+        Path,
+        Treasure,
+        Delete
+    }
+
     public partial class MainWindow : Window
     {
-        // Ne valtoztasd lecci mer furan neznenek ki az assetek
-        private const int TileSize = 16; // Pixel art miatt fix 16, de amugy a textura pixel meretei
+        private const int TileSize = 16;
+        private const int TreasureMask = 16;
 
-        private bool isPanning = false; // Megadja, hogy eppen draggelve van-e a targy
-        private Point startPanPoint; // Megadja pont formatumba azt, ahol le lett nyomva a jobb gomb
-        private double startXOffset; // Offset az eredeti helytol a Canvasnak X-tengelyen
-        private double startYOffset; // Offset az eredeti helytol a Canvasnak Y-tengelyen
+        private bool isPanning = false;
+        private Point startPanPoint;
+        private double startXOffset;
+        private double startYOffset;
 
         private TranslateTransform CanvasTransform = new TranslateTransform();
 
-        private int[,] mazeArray; // Menteshez szukseges, az egesz map array valtozata
-        private int currentWidthInTiles = 0; // Canvas mennyi kocka X-tengelyen
-        private int currentHeightInTiles = 0; // Canvas mennyi kocka Y-tengelyen
+        private int[,] mazeArray;
+        private int currentWidthInTiles = 0;
+        private int currentHeightInTiles = 0;
 
-        // --- ÚJ VÁLTOZÓK AZ AUTOMATIKUS ELHELYEZÉSHEZ ÉS HÚZÁSHOZ ---
-        private bool isDrawing = false; // Megadja, hogy éppen bal klikkel rajzolunk-e húzással
-        private UIElement[,] visualGrid; // Tárolja a canvasra lerakott Image elemeket a frissítésekhez
+        private bool isDrawing = false;
+        private UIElement[,] visualGrid;
+        private Point? lastDrawnTile = null;
 
-        // --- TEXTÚRA GYORSÍTÓTÁR (CACHE) ---
-        // Itt tároljuk a betöltött képeket, hogy ne kelljen őket folyton újraalkotni drag közben
         private Dictionary<string, BitmapImage> tileTextures = new Dictionary<string, BitmapImage>();
+
+        private DrawMode currentMode = DrawMode.Path;
 
         public MainWindow()
         {
@@ -46,37 +51,59 @@ namespace LabirintusSzerkeszto
             transformGroup.Children.Add(CanvasTransform);
             BuildCanvas.RenderTransform = transformGroup;
 
-            // Textúrák egyszeri beolvasása a memóriába
             LoadTileTextures();
 
-            // Alapértelmezett háttérkefe beállítása a cache-ből
             CanvasTileBrush.ImageSource = tileTextures["Empty_Tile.png"];
 
-            // Lefutasnal Meret Beallitas
             UpdateCanvasSize();
+            UpdateModeUI();
         }
 
-        // Minden textúrát betöltünk egyszer az indításkor
         private void LoadTileTextures()
         {
-            string[] assets = {
+            string[] assets =
+            {
                 "Empty_Tile.png",
                 "dead_end.png",
                 "corridor.png",
                 "corner_turn_simple.png",
                 "t_turn.png",
-                "4_turn.png"
+                "4_turn.png",
+                "Treasure_Chest.png"
             };
 
             foreach (var asset in assets)
             {
-                // Használhatsz relatív utat is ("/assets/{asset}"), ha a fájl tulajdonságainál a Build Action = Resource!
                 Uri uri = new Uri($"pack://application:,,,/assets/{asset}", UriKind.Absolute);
                 tileTextures[asset] = new BitmapImage(uri);
             }
         }
 
-        // Minden Text Valtozasnal Dinamikus Valtozas
+        private void BtnModePath_Click(object sender, RoutedEventArgs e)
+        {
+            currentMode = DrawMode.Path;
+            UpdateModeUI();
+        }
+
+        private void BtnModeTreasure_Click(object sender, RoutedEventArgs e)
+        {
+            currentMode = DrawMode.Treasure;
+            UpdateModeUI();
+        }
+
+        private void BtnModeDelete_Click(object sender, RoutedEventArgs e)
+        {
+            currentMode = DrawMode.Delete;
+            UpdateModeUI();
+        }
+
+        private void UpdateModeUI()
+        {
+            BtnModePath.Background = currentMode == DrawMode.Path ? Brushes.LightGreen : Brushes.LightGray;
+            BtnModeTreasure.Background = currentMode == DrawMode.Treasure ? Brushes.LightGreen : Brushes.LightGray;
+            BtnModeDelete.Background = currentMode == DrawMode.Delete ? Brushes.LightCoral : Brushes.LightGray;
+        }
+
         private void SizeChanged_Event(object sender, TextChangedEventArgs e)
         {
             UpdateCanvasSize();
@@ -86,24 +113,24 @@ namespace LabirintusSzerkeszto
         {
             if (TxtXSize == null || TxtYSize == null || BuildCanvas == null) return;
 
-            // 16*16 ertekek mer abba rajzoltam az asseteket :P
             if (int.TryParse(TxtXSize.Text, out int xTiles) && int.TryParse(TxtYSize.Text, out int yTiles))
             {
+                if (xTiles <= 0 || yTiles <= 0)
+                    return;
+
                 if (xTiles != currentWidthInTiles || yTiles != currentHeightInTiles)
                 {
                     currentWidthInTiles = xTiles;
                     currentHeightInTiles = yTiles;
 
-                    // mazeArray -> mindent tarol szam ertekekben; 0 = ut; 1 = fal;
                     mazeArray = new int[currentWidthInTiles, currentHeightInTiles];
-                    visualGrid = new UIElement[currentWidthInTiles, currentHeightInTiles]; // Új vizuális tömb inicializálása
+                    visualGrid = new UIElement[currentWidthInTiles, currentHeightInTiles];
 
-                    // array feloltese falakkal ; ez nem a gen-hez tartozik
                     for (int x = 0; x < currentWidthInTiles; x++)
                     {
                         for (int y = 0; y < currentHeightInTiles; y++)
                         {
-                            mazeArray[x, y] = 1;
+                            mazeArray[x, y] = -1;
                         }
                     }
 
@@ -115,28 +142,24 @@ namespace LabirintusSzerkeszto
             }
         }
 
-        //Egyelore csak feketit kockakat, majd kivalasztott targyakat tud lerakni
         private void BuildCanvas_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // Jobb eger section, itt mozgat
             if (e.ChangedButton == MouseButton.Right)
             {
-                isPanning = true; // elkezdi a draget
+                isPanning = true;
+                startPanPoint = e.GetPosition(this);
+                startXOffset = CanvasTransform.X;
+                startYOffset = CanvasTransform.Y;
 
-                startPanPoint = e.GetPosition(this); // megadja a kezdo pozijat a dragnek
-
-                startXOffset = CanvasTransform.X; // megadja a dragging kezdo offsetjet
-                startYOffset = CanvasTransform.Y; // canvastransform alapbol ad egy tengelyt amin mozoghat a canvas
-
-                BuildCanvas.CaptureMouse(); // megragadja az egeret, drag modba lep, kimehet az ablakbol is akar
-                e.Handled = true; // elvegzi az eventet, lezarja
+                BuildCanvas.CaptureMouse();
+                e.Handled = true;
                 return;
             }
 
-            if (e.ChangedButton == MouseButton.Left) // kifesti a negyzeteket, checkol bal clicket
+            if (e.ChangedButton == MouseButton.Left)
             {
                 isDrawing = true;
-                BuildCanvas.CaptureMouse(); // Megragadja az egeret a folyamatos rajzoláshoz húzás közben
+                BuildCanvas.CaptureMouse();
                 DrawPathAtPosition(e.GetPosition(BuildCanvas));
                 e.Handled = true;
             }
@@ -144,71 +167,203 @@ namespace LabirintusSzerkeszto
 
         private void BuildCanvas_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isPanning) // checkolja hogy eppen draggel-e
+            if (isPanning)
             {
-                //Mozgas Kiszamolasa
-                Point currentPoint = e.GetPosition(this); // megnezi az eger poziciojat
-                double deltaX = currentPoint.X - startPanPoint.X; // megnezi a delta mozgast (az eger poziciojanak es drag startjanak kulonbsege)
+                Point currentPoint = e.GetPosition(this);
+                double deltaX = currentPoint.X - startPanPoint.X;
                 double deltaY = currentPoint.Y - startPanPoint.Y;
 
-                CanvasTransform.X = startXOffset + deltaX; // eltoljuk a poziciojat, offsethez adjuk, (ha mar alapbol el volt tolva onnan szamoljuk)
+                CanvasTransform.X = startXOffset + deltaX;
                 CanvasTransform.Y = startYOffset + deltaY;
             }
-            else if (isDrawing) // Checkolja, hogy éppen bal gombbal rajzolunk-e húzás közben
+            else if (isDrawing)
             {
                 DrawPathAtPosition(e.GetPosition(BuildCanvas));
             }
         }
 
-        // Mozgatas Vege
         private void BuildCanvas_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Right) // ellenorzi hogy a jobb click lett lenyomva
+            if (e.ChangedButton == MouseButton.Right)
             {
-                isPanning = false; // dragging leallitasa
-                BuildCanvas.ReleaseMouseCapture(); // ha meg mindig captureolve lenne akkor ha ki menne az ablakbol is "ra lenne tapadva az eger"
-                e.Handled = true; // esemeny lezarasa
+                isPanning = false;
+                BuildCanvas.ReleaseMouseCapture();
+                e.Handled = true;
             }
-            else if (e.ChangedButton == MouseButton.Left) // Ellenőrzi, hogy a bal klikk fel lett-e engedve
+            else if (e.ChangedButton == MouseButton.Left)
             {
                 isDrawing = false;
-                BuildCanvas.ReleaseMouseCapture(); // Elengedi az egeret a rajzolási módból
+                lastDrawnTile = null;
+                BuildCanvas.ReleaseMouseCapture();
                 e.Handled = true;
             }
         }
 
-        // --- ÚJ METÓDUSOK A FOLYAMATOS RAJZOLÁSHOZ ÉS AUTOMATIKUS TEXTÚRÁZÁSHOZ ---
-
-        // Kiszámolja a koordinátát húzás közben, és elindítja a csempék frissítését
         private void DrawPathAtPosition(Point position)
         {
-            int tileXIndex = (int)position.X / TileSize;
-            int tileYIndex = (int)position.Y / TileSize;
+            if (mazeArray == null) return;
 
-            // Határon belul ellenorzes
-            if (tileXIndex >= 0 && tileXIndex < currentWidthInTiles && tileYIndex >= 0 && tileYIndex < currentHeightInTiles)
+            int tileXIndex = (int)Math.Floor(position.X / TileSize);
+            int tileYIndex = (int)Math.Floor(position.Y / TileSize);
+
+            if (currentMode == DrawMode.Path && lastDrawnTile != null)
             {
-                if (mazeArray[tileXIndex, tileYIndex] != 0) // megnezi hogy van e mar ut ( 0 = ut )
-                {
-                    mazeArray[tileXIndex, tileYIndex] = 0; // utat tesz a mentesi array-ba
+                int lastX = (int)lastDrawnTile.Value.X;
+                int lastY = (int)lastDrawnTile.Value.Y;
+                bool isExitCreated = false;
 
-                    // Frissítjük a jelenlegi csempét és mind a 4 közvetlen szomszédját is!
+                if (tileXIndex < 0 && lastX == 0) { mazeArray[lastX, lastY] |= 8; isExitCreated = true; }
+                else if (tileXIndex >= currentWidthInTiles && lastX == currentWidthInTiles - 1) { mazeArray[lastX, lastY] |= 2; isExitCreated = true; }
+                else if (tileYIndex < 0 && lastY == 0) { mazeArray[lastX, lastY] |= 1; isExitCreated = true; }
+                else if (tileYIndex >= currentHeightInTiles && lastY == currentHeightInTiles - 1) { mazeArray[lastX, lastY] |= 4; isExitCreated = true; }
+
+                if (isExitCreated)
+                {
+                    UpdateTileVisual(lastX, lastY);
+                }
+            }
+
+            if (tileXIndex >= 0 && tileXIndex < currentWidthInTiles &&
+                tileYIndex >= 0 && tileYIndex < currentHeightInTiles)
+            {
+                if (currentMode == DrawMode.Delete)
+                {
+                    DeleteTile(tileXIndex, tileYIndex);
+                    lastDrawnTile = new Point(tileXIndex, tileYIndex);
+                }
+                else if (currentMode == DrawMode.Treasure)
+                {
+                    if (mazeArray[tileXIndex, tileYIndex] == -1)
+                    {
+                        mazeArray[tileXIndex, tileYIndex] = TreasureMask;
+                    }
+                    else
+                    {
+                        mazeArray[tileXIndex, tileYIndex] |= TreasureMask;
+                    }
+
                     UpdateTileVisual(tileXIndex, tileYIndex);
-                    UpdateTileVisual(tileXIndex, tileYIndex - 1); // Észak
-                    UpdateTileVisual(tileXIndex + 1, tileYIndex); // Kelet
-                    UpdateTileVisual(tileXIndex, tileYIndex + 1); // Dél
-                    UpdateTileVisual(tileXIndex - 1, tileYIndex); // Nyugat
+                    lastDrawnTile = new Point(tileXIndex, tileYIndex);
+                }
+                else if (currentMode == DrawMode.Path)
+                {
+                    if (lastDrawnTile == null)
+                    {
+                        if (mazeArray[tileXIndex, tileYIndex] == -1)
+                        {
+                            mazeArray[tileXIndex, tileYIndex] = 0;
+                        }
+
+                        UpdateTileVisual(tileXIndex, tileYIndex);
+                        lastDrawnTile = new Point(tileXIndex, tileYIndex);
+                    }
+                    else
+                    {
+                        int lastX = (int)lastDrawnTile.Value.X;
+                        int lastY = (int)lastDrawnTile.Value.Y;
+
+                        if (lastX != tileXIndex || lastY != tileYIndex)
+                        {
+                            while (lastX != tileXIndex || lastY != tileYIndex)
+                            {
+                                int nextX = lastX;
+                                int nextY = lastY;
+
+                                if (lastX < tileXIndex) nextX++;
+                                else if (lastX > tileXIndex) nextX--;
+                                else if (lastY < tileYIndex) nextY++;
+                                else if (lastY > tileYIndex) nextY--;
+
+                                if (nextX >= 0 && nextX < currentWidthInTiles &&
+                                    nextY >= 0 && nextY < currentHeightInTiles)
+                                {
+                                    ConnectTiles(lastX, lastY, nextX, nextY);
+                                }
+
+                                lastX = nextX;
+                                lastY = nextY;
+                            }
+
+                            lastDrawnTile = new Point(tileXIndex, tileYIndex);
+                        }
+                    }
                 }
             }
         }
 
-        // Újraértékeli az adott csempe szomszédait, kiválasztja az assetet és beállítja a rotációt
+        private void DeleteTile(int x, int y)
+        {
+            if (mazeArray[x, y] == -1) return;
+
+            int value = mazeArray[x, y];
+            int pathMask = value & 15;
+
+            if (pathMask != 0)
+            {
+                if ((pathMask & 1) == 1 && y - 1 >= 0 && (mazeArray[x, y - 1] & 15) != 0)
+                {
+                    mazeArray[x, y - 1] &= ~4;
+                    UpdateTileVisual(x, y - 1);
+                }
+
+                if ((pathMask & 2) == 2 && x + 1 < currentWidthInTiles && (mazeArray[x + 1, y] & 15) != 0)
+                {
+                    mazeArray[x + 1, y] &= ~8;
+                    UpdateTileVisual(x + 1, y);
+                }
+
+                if ((pathMask & 4) == 4 && y + 1 < currentHeightInTiles && (mazeArray[x, y + 1] & 15) != 0)
+                {
+                    mazeArray[x, y + 1] &= ~1;
+                    UpdateTileVisual(x, y + 1);
+                }
+
+                if ((pathMask & 8) == 8 && x - 1 >= 0 && (mazeArray[x - 1, y] & 15) != 0)
+                {
+                    mazeArray[x - 1, y] &= ~2;
+                    UpdateTileVisual(x - 1, y);
+                }
+            }
+
+            mazeArray[x, y] = -1;
+            UpdateTileVisual(x, y);
+        }
+
+        private void ConnectTiles(int x1, int y1, int x2, int y2)
+        {
+            if (mazeArray[x1, y1] == -1) mazeArray[x1, y1] = 0;
+            if (mazeArray[x2, y2] == -1) mazeArray[x2, y2] = 0;
+
+            if (x2 == x1 + 1)
+            {
+                mazeArray[x1, y1] |= 2;
+                mazeArray[x2, y2] |= 8;
+            }
+            else if (x2 == x1 - 1)
+            {
+                mazeArray[x1, y1] |= 8;
+                mazeArray[x2, y2] |= 2;
+            }
+            else if (y2 == y1 + 1)
+            {
+                mazeArray[x1, y1] |= 4;
+                mazeArray[x2, y2] |= 1;
+            }
+            else if (y2 == y1 - 1)
+            {
+                mazeArray[x1, y1] |= 1;
+                mazeArray[x2, y2] |= 4;
+            }
+
+            UpdateTileVisual(x1, y1);
+            UpdateTileVisual(x2, y2);
+        }
+
         private void UpdateTileVisual(int x, int y)
         {
             if (x < 0 || x >= currentWidthInTiles || y < 0 || y >= currentHeightInTiles) return;
 
-            // Ha ez egy fal (1), akkor eltávolítjuk a rajta lévő utat, hogy az alapértelmezett háttér látszódjon
-            if (mazeArray[x, y] == 1)
+            if (mazeArray[x, y] == -1)
             {
                 if (visualGrid[x, y] != null)
                 {
@@ -218,46 +373,48 @@ namespace LabirintusSzerkeszto
                 return;
             }
 
-            // Bitmaszk kiszámítása a szomszédos utak alapján (0 = út)
-            int mask = 0;
-            if (y > 0 && mazeArray[x, y - 1] == 0) mask |= 1;                      // Észak (Bit 0)
-            if (x < currentWidthInTiles - 1 && mazeArray[x + 1, y] == 0) mask |= 2;  // Kelet (Bit 1)
-            if (y < currentHeightInTiles - 1 && mazeArray[x, y + 1] == 0) mask |= 4; // Dél (Bit 2)
-            if (x > 0 && mazeArray[x - 1, y] == 0) mask |= 8;                      // Nyugat (Bit 3)
+            int value = mazeArray[x, y];
+            bool hasTreasure = (value & TreasureMask) != 0;
+            int pathMask = value & 15;
 
-            // Megkeressük a maszkhoz tartozó fájlnevet és rotációs szöget
-            GetTileAssetAndRotation(mask, out string assetName, out double angle);
+            string assetName;
+            double angle = 0;
 
-            // Ha már volt itt korábban lerakott elem, töröljük a Canvasről az újrarajzolás előtt
+            if (hasTreasure)
+            {
+                assetName = "Treasure_Chest.png";
+                angle = 0;
+            }
+            else
+            {
+                GetTileAssetAndRotation(pathMask, out assetName, out angle);
+            }
+
             if (visualGrid[x, y] != null)
             {
                 BuildCanvas.Children.Remove(visualGrid[x, y]);
             }
 
-            // Új Image elem létrehozása a már memóriában lévő gyorsítótárazott (cached) textúrával
             Image tileImage = new Image
             {
                 Width = TileSize,
                 Height = TileSize,
-                Source = tileTextures[assetName] // Sokkal gyorsabb, nincs fájl IO vagy URI parzolás futásidőben!
+                Source = tileTextures[assetName]
             };
 
-            // Rotáció alkalmazása a csempe középpontjához képest
             if (angle != 0)
             {
                 tileImage.RenderTransformOrigin = new Point(0.5, 0.5);
                 tileImage.RenderTransform = new RotateTransform(angle);
             }
 
-            // Pozíció beállítása a Canvasen
             Canvas.SetLeft(tileImage, x * TileSize);
             Canvas.SetTop(tileImage, y * TileSize);
 
             BuildCanvas.Children.Add(tileImage);
-            visualGrid[x, y] = tileImage; // Eltároljuk a referenciát a későbbi frissítésekhez
+            visualGrid[x, y] = tileImage;
         }
 
-        // Egy elágazási táblázat, ami a szomszédok bitmaszkja alapján visszaadja az asset nevet és a forgatást
         private void GetTileAssetAndRotation(int mask, out string assetName, out double angle)
         {
             assetName = "dead_end.png";
@@ -265,78 +422,224 @@ namespace LabirintusSzerkeszto
 
             switch (mask)
             {
-                // 0 vagy 1 szomszéd (Zsákutcák)
-                case 0: assetName = "dead_end.png"; angle = 180; break;
-                case 1: assetName = "dead_end.png"; angle = 180; break;   // Észak felé nyitott
-                case 2: assetName = "dead_end.png"; angle = -90; break;  // Kelet felé nyitott
-                case 4: assetName = "dead_end.png"; angle = 0; break; // Dél felé nyitott
-                case 8: assetName = "dead_end.png"; angle = -270; break; // Nyugat felé nyitott
+                case 0:
+                    assetName = "dead_end.png";
+                    angle = 180;
+                    break;
 
-                // 2 szomszéd (Egyenes folyosók vagy Kanyarok)
-                case 5: assetName = "corridor.png"; angle = 0; break;   // Észak + Dél folyosó
-                case 10: assetName = "corridor.png"; angle = 90; break;  // Kelet + Nyugat folyosó
-                case 3: assetName = "corner_turn_simple.png"; angle = -90; break;   // Észak + Kelet kanyar
-                case 6: assetName = "corner_turn_simple.png"; angle = 0; break;  // Kelet + Dél kanyar
-                case 12: assetName = "corner_turn_simple.png"; angle = 90; break; // Dél + Nyugat kanyar
-                case 9: assetName = "corner_turn_simple.png"; angle = 180; break; // Nyugat + Észak kanyar
+                case 1:
+                    assetName = "dead_end.png";
+                    angle = 180;
+                    break;
 
-                // 3 szomszéd (T-elágazások)
-                case 11: assetName = "t_turn.png"; angle = 180; break;   // Észak + Kelet + Nyugat
-                case 7: assetName = "t_turn.png"; angle = 270; break;  // Észak + Kelet + Dél
-                case 14: assetName = "t_turn.png"; angle = 0; break; // Kelet + Dél + Nyugat
-                case 13: assetName = "t_turn.png"; angle = 90; break; // Dél + Nyugat + Észak
+                case 2:
+                    assetName = "dead_end.png";
+                    angle = -90;
+                    break;
 
-                // 4 szomszéd (Kereszteződés)
-                case 15: assetName = "4_turn.png"; angle = 0; break;   // Mind a 4 irányba nyitott
+                case 4:
+                    assetName = "dead_end.png";
+                    angle = 0;
+                    break;
+
+                case 8:
+                    assetName = "dead_end.png";
+                    angle = -270;
+                    break;
+
+                case 5:
+                    assetName = "corridor.png";
+                    angle = 0;
+                    break;
+
+                case 10:
+                    assetName = "corridor.png";
+                    angle = 90;
+                    break;
+
+                case 3:
+                    assetName = "corner_turn_simple.png";
+                    angle = -90;
+                    break;
+
+                case 6:
+                    assetName = "corner_turn_simple.png";
+                    angle = 0;
+                    break;
+
+                case 12:
+                    assetName = "corner_turn_simple.png";
+                    angle = 90;
+                    break;
+
+                case 9:
+                    assetName = "corner_turn_simple.png";
+                    angle = 180;
+                    break;
+
+                case 11:
+                    assetName = "t_turn.png";
+                    angle = 180;
+                    break;
+
+                case 7:
+                    assetName = "t_turn.png";
+                    angle = 270;
+                    break;
+
+                case 14:
+                    assetName = "t_turn.png";
+                    angle = 0;
+                    break;
+
+                case 13:
+                    assetName = "t_turn.png";
+                    angle = 90;
+                    break;
+
+                case 15:
+                    assetName = "4_turn.png";
+                    angle = 0;
+                    break;
             }
         }
 
-        // Zoom function
         private void BuildCanvas_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            if (!Keyboard.IsKeyDown(Key.LeftCtrl) && !Keyboard.IsKeyDown(Key.RightCtrl)) // szukseges gombok lenyomasanak ellenorzese
+            if (!Keyboard.IsKeyDown(Key.LeftCtrl) && !Keyboard.IsKeyDown(Key.RightCtrl))
                 return;
 
-            double zoomFactor = 0.1; // zoom mennyisege
-            double currentScale = CanvasScale.ScaleX; // jelenlegi scale
+            double zoomFactor = 0.1;
+            double currentScale = CanvasScale.ScaleX;
 
-            if (e.Delta > 0) // Delta = irany; ha pozitiv akkor befele, ha negativ akkor kifele
-            {
+            if (e.Delta > 0)
                 currentScale += zoomFactor;
-            }
             else
-            {
                 currentScale -= zoomFactor;
-            }
 
             if (currentScale < 0.5) currentScale = 0.5;
-            if (currentScale > 5.0) currentScale = 5.0; // itt a hatar a zoomra
+            if (currentScale > 5.0) currentScale = 5.0;
 
-            CanvasScale.ScaleX = currentScale; // modositja a zoomot X
-            CanvasScale.ScaleY = currentScale; // modositja a zoomot Y
+            CanvasScale.ScaleX = currentScale;
+            CanvasScale.ScaleY = currentScale;
 
-            e.Handled = true; //esemeny lezarasa
+            e.Handled = true;
         }
 
-        // Export Gomb (Meg szarul nez ki majd megcsinalom)
         private void BtnExport_Click(object sender, RoutedEventArgs e)
         {
             if (mazeArray == null) return;
 
+            if (!ValidateMapForExport(out string errorMessage))
+            {
+                MessageBox.Show(errorMessage, "Exportálás sikertelen", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            SaveFileDialog saveDialog = new SaveFileDialog
+            {
+                Filter = "Map file (*.map)|*.map|Text file (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = ".map",
+                FileName = "maze.map"
+            };
+
+            if (saveDialog.ShowDialog() != true)
+                return;
+
+            string mapText = BuildExportMapText();
+            File.WriteAllText(saveDialog.FileName, mapText, new UTF8Encoding(false));
+
+            MessageBox.Show("Sikeres mentés", "Exportálás", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private bool ValidateMapForExport(out string errorMessage)
+        {
+            bool hasTreasure = false;
+            bool hasEdgeExit = false;
+
+            for (int x = 0; x < currentWidthInTiles; x++)
+            {
+                for (int y = 0; y < currentHeightInTiles; y++)
+                {
+                    int value = mazeArray[x, y];
+                    if (value == -1) continue;
+
+                    if ((value & TreasureMask) != 0)
+                        hasTreasure = true;
+
+                    int pathMask = value & 15;
+                    if (pathMask == 0) continue;
+
+                    if (y == 0 && (pathMask & 1) != 0) hasEdgeExit = true;
+                    if (x == currentWidthInTiles - 1 && (pathMask & 2) != 0) hasEdgeExit = true;
+                    if (y == currentHeightInTiles - 1 && (pathMask & 4) != 0) hasEdgeExit = true;
+                    if (x == 0 && (pathMask & 8) != 0) hasEdgeExit = true;
+                }
+            }
+
+            if (!hasEdgeExit)
+            {
+                errorMessage = "A térképen legalább egy, a szélen lévő kijáratnak lennie kell.";
+                return false;
+            }
+
+            if (!hasTreasure)
+            {
+                errorMessage = "A térképen legalább egy kincsesládának lennie kell.";
+                return false;
+            }
+
+            errorMessage = string.Empty;
+            return true;
+        }
+
+        private string BuildExportMapText()
+        {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("--- LABIRINTUS EXPORT ---");
 
             for (int y = 0; y < currentHeightInTiles; y++)
             {
                 for (int x = 0; x < currentWidthInTiles; x++)
                 {
-                    sb.Append(mazeArray[x, y] + " ");
+                    sb.Append(GetExportChar(mazeArray[x, y]));
                 }
                 sb.AppendLine();
             }
 
-            System.Diagnostics.Debug.WriteLine(sb.ToString());
-            MessageBox.Show("Sikeres Export", "Exportálás", MessageBoxButton.OK, MessageBoxImage.Information);
+            return sb.ToString();
+        }
+
+        private char GetExportChar(int value)
+        {
+            if (value == -1)
+                return '.';
+
+            if ((value & TreasureMask) != 0)
+                return '█';
+
+            int mask = value & 15;
+
+            return mask switch
+            {
+                0 => '╬',
+
+                1 => '║',
+                2 => '═',
+                3 => '╚',
+                4 => '║',
+                5 => '║',
+                6 => '╔',
+                7 => '╠',
+                8 => '═',
+                9 => '╝',
+                10 => '═',
+                11 => '╩',
+                12 => '╗',
+                13 => '╣',
+                14 => '╦',
+                15 => '╬',
+                _ => '.'
+            };
         }
     }
 }
